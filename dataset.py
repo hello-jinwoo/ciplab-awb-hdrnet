@@ -10,14 +10,28 @@ from torchvision import transforms
 from torch.utils.data import Dataset
 
 class HDRDataset(Dataset):
-    def __init__(self, image_path, params=None, suffix='', mode='train'):
+    def __init__(self, image_path, params=None, suffix='', mode='train', illum_mode='123'):
         assert mode in ['train', 'val', 'test']
         self.mode = mode
         self.image_path = image_path
         self.suffix = suffix
         in_files = self.list_files(os.path.join(image_path, mode))
-        self.in_files = sorted([f for f in in_files if f.split('/')[-1].count('_') == 2])
-        
+        self.in_files = sorted([f for f in in_files if f.split('/')[-1].count('_') == 1 and f[-4:] == 'tiff'])
+
+        # for 1-illum only
+        if illum_mode == '1':
+            self.in_files = [f for f in self.in_files if "_1.tiff" in f]
+        # for 2-illum only
+        elif illum_mode == '2':
+            self.in_files = [f for f in self.in_files if "_12.tiff" in f]
+        # for 3-illum only
+        elif illum_mode == '3':
+            self.in_files = [f for f in self.in_files if "_123.tiff" in f]
+        # for 2 & 3
+        elif illum_mode == '23':
+            self.in_files = [f for f in self.in_files if ("_12.tiff" in f or "_123.tiff" in f)]
+
+
         self.max = 2 ** params['bit_depth'] - 1
         self.ls = params['net_input_size']
         self.fs = params['net_output_size']
@@ -50,7 +64,7 @@ class HDRDataset(Dataset):
         imagein_full = self.full(imagein)
         imageout = self.full(imageout)
         
-        gt_illum = np.load(path + fname + '_illum.npy').astype('float32')
+        gt_illum = imagein_full / (imageout + 1e-8)
         
         return imagein_low, imagein_full, imageout, gt_illum, fname
 
